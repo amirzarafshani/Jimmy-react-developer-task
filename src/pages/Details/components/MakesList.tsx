@@ -1,47 +1,39 @@
-import { useState, useEffect } from "react";
+import ErrorDisplay from "../../../components/ErrorDisplay";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import useFetch from "../../../hooks/useFetch";
 import {
+  GetMakesListResponse,
   MakeForManufacturer,
   MakesListPropsInterface,
 } from "../../../interfaces/makeForManufacturer.interface";
 import ModelsTable from "./ModelsTable";
-import API from "../../../utils/api";
 
-function MakesList({ manufacturerId }: MakesListPropsInterface) {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [makesForManufacturer, setMakesForManufacturer] = useState<
-    MakeForManufacturer[]
-  >([]);
+const apiUrl = process.env.REACT_APP_API_URL;
 
-  useEffect(() => {
-    const controller = new AbortController();
+export default function MakesList({
+  manufacturerId,
+}: MakesListPropsInterface): JSX.Element {
+  const params = { format: "json" };
+  const url = `${apiUrl}getMakeForManufacturer/${manufacturerId}?`;
 
-    const getData = async () => {
-      if (manufacturerId) {
-        setIsLoading(true);
-        await API.get(`getMakeForManufacturer/${manufacturerId}?format=json`, {
-          signal: controller.signal,
-        })
-          .then((res: any) => {
-            setMakesForManufacturer(res.data.Results);
-            setIsLoading(false);
-          })
-          .catch((err) => console.log(err))
-          .finally(() => setIsLoading(false));
-      }
-    };
-    getData();
+  const { data, hasError, error, isLoading } = useFetch<GetMakesListResponse>(
+    url,
+    params
+  );
 
-    return () => {
-      controller.abort();
-    };
-  }, [manufacturerId]);
+  const manufacturerDetailsItems: MakeForManufacturer[] =
+    data?.Results?.map((el) => ({
+      Make_ID: el.Make_ID,
+      Make_Name: el.Make_Name,
+    })) || [];
 
-  return isLoading ? (
-    <LoadingSpinner />
-  ) : makesForManufacturer ? (
-    <ul>
-      {makesForManufacturer?.map((make: MakeForManufacturer) => (
+  if (isLoading) return <LoadingSpinner />;
+
+  if (hasError) return <ErrorDisplay error={error?.name} />;
+
+  return (
+    <ul className="manufacturer-details-list">
+      {manufacturerDetailsItems?.map((make: MakeForManufacturer) => (
         <li key={make.Make_ID}>
           <div className="p-3 w-full bg-white rounded-lg border shadow-md sm:p-8 my-3">
             <h5 className="mb-2 font-semibold">{`Model for make ${make.Make_Name}`}</h5>
@@ -50,9 +42,5 @@ function MakesList({ manufacturerId }: MakesListPropsInterface) {
         </li>
       ))}
     </ul>
-  ) : (
-    <div>error</div>
   );
 }
-
-export default MakesList;

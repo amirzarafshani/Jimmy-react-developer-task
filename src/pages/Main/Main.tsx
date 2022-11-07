@@ -1,83 +1,84 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import ReactPaginate from "react-paginate";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { ManufacturerInterface } from "../../interfaces/manufacturer.interface";
+import {
+  GetManufacturersResponse,
+  ManufacturerInterface,
+} from "../../interfaces/manufacturer.interface";
 import { OnPageChangeInterface } from "../../interfaces/pagination.interface";
-import API from "../../utils/api";
-import TableRow from "./components/TableRow";
+import useFetch from "../../hooks/useFetch";
+import useNoInitialEffect from "../../hooks/useNoInitialEffect";
+import Table from "../../components/Table";
+import { Link } from "react-router-dom";
+import ErrorDisplay from "../../components/ErrorDisplay";
 
-const ITEMS_PER_PAGE: number = 100;
+const apiUrl = process.env.REACT_APP_API_URL;
+const url = `${apiUrl}getallmanufacturers?`;
 
 const Main = () => {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [page, setPage] = useState<number>(1);
-  const [pageCount, setPageCount] = useState<number>(0);
-  const [data, setData] = useState<ManufacturerInterface[] | undefined>(
-    undefined
-  );
+  const [params, setParams] = useState<any>({ page: page, format: "json" });
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const { data, hasError, error, isLoading, refetch } =
+    useFetch<GetManufacturersResponse>(url, params);
 
-    const getData = async () => {
-      await API.get(`getallmanufacturers?format=json&page=${page}`, {
-        signal: controller.signal,
-      })
-        .then((res) => {
-          setData(res.data?.Results);
-          setPageCount(Math.ceil(res.data.Results.length / ITEMS_PER_PAGE));
-        })
-        .catch((error) => {
-          console.log(error);
-        })
-        .finally(() => setIsLoading(false));
-    };
-    getData();
-
-    return () => {
-      controller.abort();
-    };
+  useNoInitialEffect(() => {
+    setParams({ page: page, format: "json" });
   }, [page]);
 
+  useNoInitialEffect(() => {
+    refetch(params);
+  }, [params]);
+
   const handlePageClick = (event: OnPageChangeInterface) => {
-    setPage(event.selected);
+    setPage(event.selected + 1);
   };
 
-  return isLoading ? (
-    <LoadingSpinner />
-  ) : (
+  const manufacturerHeaders: any = {
+    Mfr_ID: "ID",
+    comonName: "company name",
+    country: "country",
+    link: "",
+  };
+
+  const manufacturerItems: (ManufacturerInterface & { link: number })[] =
+    data?.Results?.map((el) => ({
+      Mfr_ID: el.Mfr_ID,
+      Mfr_CommonName: el.Mfr_CommonName,
+      Country: el.Country,
+      link: el.Mfr_ID,
+    })) || [];
+
+  if (isLoading) return <LoadingSpinner />;
+
+  if (hasError) return <ErrorDisplay error={error?.name} />;
+
+  return (
     <div className="container mx-auto my-5">
-      <table
-        className="min-w-full divide-y divide-gray-200 border border-gray-200"
-        data-testid="manufacturers-list"
-      >
-        <thead className="bg-blue-600 text-white uppercase">
-          <tr className="">
-            <th className="p-2.5 text-left">ID</th>
-            <th className="px-1 text-left">common name</th>
-            <th className="px-1 text-left">country</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.map((item: ManufacturerInterface) => (
-            <TableRow key={item.Mfr_ID} manufacturer={item} />
-          ))}
-        </tbody>
-      </table>
       <ReactPaginate
         breakLabel="..."
         nextLabel=">"
         onPageChange={handlePageClick}
-        pageRangeDisplayed={5}
-        pageCount={pageCount}
+        pageCount={10}
         previousLabel="<"
-        containerClassName="flex items-center justify-center gap-1 w-full text-center py-5"
-        pageClassName=""
-        pageLinkClassName="border border-gray-400 rounded-md px-2 py-1 hover:bg-blue-700 hover:text-white hover:border-blue-700"
-        nextLinkClassName="border border-gray-400 rounded-md px-2 py-1 hover:bg-blue-700 hover:text-white hover:border-blue-700"
-        previousLinkClassName="border border-gray-400 rounded-md px-2 py-1 hover:bg-blue-700 hover:text-white hover:border-blue-700"
-        renderOnZeroPageCount={undefined}
+        containerClassName="pagination"
+        forcePage={page - 1}
+      />
+
+      <Table
+        headers={manufacturerHeaders}
+        items={manufacturerItems}
+        className="table"
+        customRenderers={{
+          link: (it) => (
+            <Link
+              to={`/details/${it.link}`}
+              className="px-3 py-1.5 rounded-md border border-blue-700 text-blue-800 font-semibold hover:bg-blue-500 hover:text-white transition-all cursor-pointer text-sm"
+            >
+              SHOW DETAILS
+            </Link>
+          ),
+        }}
       />
     </div>
   );

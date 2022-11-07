@@ -1,62 +1,46 @@
-import { useEffect, useState } from "react";
+import ErrorDisplay from "../../../components/ErrorDisplay";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Table from "../../../components/Table";
+import useFetch from "../../../hooks/useFetch";
 import {
+  GetManufacturersResponse,
   ManufacturerDetailsPropsInterface,
   ManufacturerInterface,
 } from "../../../interfaces/manufacturer.interface";
-import API from "../../../utils/api";
+
+const apiUrl = process.env.REACT_APP_API_URL;
 
 export default function ManufacturerDetails({
   manufacturerId,
 }: ManufacturerDetailsPropsInterface): JSX.Element {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [manufacturerDetails, setManufacturerDetails] =
-    useState<ManufacturerInterface | null>(null);
+  const params = { format: "json" };
+  const url = `${apiUrl}getmanufacturerdetails/${manufacturerId}?`;
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const { data, hasError, error, isLoading } =
+    useFetch<GetManufacturersResponse>(url, params);
 
-    const getData = () => {
-      API.get(`getmanufacturerdetails/${manufacturerId}?format=json`)
-        .then((res) => {
-          setManufacturerDetails(res.data.Results[0]);
-          // setIsLoading(false);
-        })
-        .catch((err) => console.log(err))
-        .finally(() => setIsLoading(false));
-    };
-    if (manufacturerId) {
-      getData();
-    }
+  const manufacturerDetailsHeaders: any = {
+    Mfr_ID: "ID",
+    comonName: "company name",
+    country: "country",
+  };
 
-    return () => {
-      controller.abort();
-    };
-  }, [manufacturerId]);
+  const manufacturerDetailsItems: ManufacturerInterface[] =
+    data?.Results?.map((el) => ({
+      Mfr_ID: el.Mfr_ID,
+      Mfr_CommonName: el.Mfr_CommonName,
+      Country: el.Country,
+    })) || [];
 
-  return isLoading ? (
-    <LoadingSpinner />
-  ) : manufacturerDetails ? (
-    <table
-      className="min-w-full divide-y divide-gray-200 border border-gray-200"
-      data-testid="manufacturer-details"
-    >
-      <thead className="bg-blue-600 text-white">
-        <tr className="uppercase">
-          <th className="p-2.5 text-left">ID</th>
-          <th className="px-1 text-left">common name</th>
-          <th className="px-1 text-left">country</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr className="bg-white border-b">
-          <td className="p-2.5">{manufacturerDetails?.Mfr_ID}</td>
-          <td className="px-1">{manufacturerDetails?.Mfr_CommonName}</td>
-          <td className="px-1">{manufacturerDetails?.Country}</td>
-        </tr>
-      </tbody>
-    </table>
-  ) : (
-    <div>error</div>
+  if (isLoading) return <LoadingSpinner />;
+
+  if (hasError) return <ErrorDisplay error={error?.name} />;
+
+  return (
+    <Table
+      headers={manufacturerDetailsHeaders}
+      items={manufacturerDetailsItems}
+      className="table"
+    />
   );
 }

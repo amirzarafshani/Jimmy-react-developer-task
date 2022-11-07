@@ -1,61 +1,40 @@
-import { useState, useEffect } from "react";
+import ErrorDisplay from "../../../components/ErrorDisplay";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Table from "../../../components/Table";
+import useFetch from "../../../hooks/useFetch";
 import {
+  GetModelsResponse,
   ModelInterface,
   ModelsPropsInterface,
 } from "../../../interfaces/model.interface";
-import ModelTableRow from "./ModelTableRow";
-import API from "../../../utils/api";
 
-function ModelsTable({ makeId }: ModelsPropsInterface) {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [models, setModels] = useState<ModelInterface[] | null>(null);
+const apiUrl = process.env.REACT_APP_API_URL;
 
-  useEffect(() => {
-    const controller = new AbortController();
+export default function ModelsTable({
+  makeId,
+}: ModelsPropsInterface): JSX.Element {
+  const params = { format: "json" };
+  const url = `${apiUrl}getModelsForMakeId/${makeId}?`;
 
-    const getData = async () => {
-      setIsLoading(true);
-      API.get(`getModelsForMakeId/${makeId}?format=json`, {
-        signal: controller.signal,
-      })
-        .then((res) => {
-          setModels(res.data.Results);
-        })
-        .catch((err) => console.log(err))
-        .finally(() => setIsLoading(false));
-    };
-    if (makeId) {
-      getData();
-    }
-
-    return () => {
-      controller.abort();
-    };
-  }, [makeId]);
-
-  return isLoading ? (
-    <LoadingSpinner />
-  ) : models ? (
-    <table
-      className="min-w-full divide-y divide-gray-200 border border-gray-200"
-      data-testid="models-table"
-    >
-      <thead className="bg-blue-600 text-white">
-        <tr className="uppercase">
-          <th className="px-1 text-left w-1/3">MODEL ID</th>
-          <th className="px-1 text-left">MODEL NAME</th>
-        </tr>
-      </thead>
-      <tbody>
-        {models?.map((model: ModelInterface) => (
-          <ModelTableRow key={model.Model_ID} model={model} />
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <div>error</div>
+  const { data, hasError, error, isLoading } = useFetch<GetModelsResponse>(
+    url,
+    params
   );
-}
 
-export default ModelsTable;
+  const modelHeaders: any = {
+    Model_ID: "MODEL ID",
+    Model_Name: "MODEL NAME",
+  };
+
+  const modelItems: ModelInterface[] =
+    data?.Results?.map((el) => ({
+      Model_ID: el.Model_ID,
+      Model_Name: el.Model_Name,
+    })) || [];
+
+  if (isLoading) return <LoadingSpinner />;
+
+  if (hasError) return <ErrorDisplay error={error?.name} />;
+
+  return <Table headers={modelHeaders} items={modelItems} className="table" />;
+}
